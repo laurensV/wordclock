@@ -38,7 +38,7 @@
 #include <WiFiManager.h>                //https://github.com/tzapu/WiFiManager WiFi Configuration Magic
 #include <EEPROM.h>                     //from ESP8266 Arduino Core (automatically installed when ESP8266 was installed via Boardmanager)
 #include <DS3231.h>
-#include <Wire.h>
+
 
 // own libraries
 #include "udplogger.h"
@@ -60,8 +60,9 @@
 #define ADR_BRIGHTNESS 16
 
 
-#define NEOPIXELPIN 5       // pin to which the NeoPixels are attached
+#define NEOPIXELPIN 0       // pin to which the NeoPixels are attached
 #define NUMPIXELS 173       // number of pixels attached to Attiny85   Onno. Was 125.
+#define BUTTONPIN 14        // pin to which the button is attached
 #define LEFT 1
 #define RIGHT 2
 #define LINE 10
@@ -154,23 +155,24 @@ Adafruit_NeoMatrix matrix = Adafruit_NeoMatrix(WIDTH, HEIGHT + 1, NEOPIXELPIN,
   NEO_GRB            + NEO_KHZ800);
 
 
-// seven predefined colors24bit (green, red, yellow, purple, orange, lightgreen, blue) 
+// seven predefined colors24bit white [0], red [1], yellow [2], purple[3], orange [4], green [5], blue [6], blue [7]
 const uint32_t colors24bit[NUM_COLORS] = {
   //LEDMatrix::Color24bit(0, 255, 0), 
-  LEDMatrix::Color24bit(225, 225, 225), //Onno white
-  //LEDMatrix::Color24bit(255, 0, 0), 
-  LEDMatrix::Color24bit(225, 225, 225), //Onno white
-  //LEDMatrix::Color24bit(200, 200, 0), 
-  LEDMatrix::Color24bit(225, 225, 225), //Onno white
-  //LEDMatrix::Color24bit(255, 0, 200), 
-  LEDMatrix::Color24bit(225, 225, 225), //Onno white
-  //LEDMatrix::Color24bit(255, 128, 0), 
-  LEDMatrix::Color24bit(225, 225, 225), //Onno white
-  //LEDMatrix::Color24bit(0, 128, 0), 
-  LEDMatrix::Color24bit(225, 225, 225), //Onno white
+  LEDMatrix::Color24bit(225, 225, 225),
+  //LEDMatrix::Color24bit(225, 225, 225), //Onno white
+  LEDMatrix::Color24bit(255, 0, 0), 
+  //LEDMatrix::Color24bit(225, 225, 225), //Onno white
+  LEDMatrix::Color24bit(200, 200, 0), 
+ // EDMatrix::Color24bit(225, 225, 225), //Onno white
+  LEDMatrix::Color24bit(255, 0, 200), 
+  //LEDMatrix::Color24bit(225, 225, 225), //Onno white
+  LEDMatrix::Color24bit(255, 128, 0), 
+  //LEDMatrix::Color24bit(225, 225, 225), //Onno white
+  LEDMatrix::Color24bit(0, 128, 0), 
+  //LEDMatrix::Color24bit(225, 225, 225), //Onno white
   LEDMatrix::Color24bit(0, 0, 255) };
 
-uint8_t brightness = 40;            // current brightness of leds
+uint8_t brightness = 40; //40; // Onno  40;            // current brightness of leds
 bool sprialDir = false;
 
 // timestamp variables
@@ -181,6 +183,7 @@ long lastStateChange = millis();    // time of last state change
 long lastNTPUpdate = millis();      // time of last NTP update
 long lastAnimationStep = millis();  // time of last Matrix update
 long lastNightmodeCheck = millis(); // time of last nightmode check
+long buttonPressStart = 0;          // time of push button press start 
 
 // Create necessary global objects
 UDPLogger logger;
@@ -192,10 +195,10 @@ Snake mysnake = Snake(&ledmatrix, &logger);
 Pong mypong = Pong(&ledmatrix, &logger);
 
 float filterFactor = DEFAULT_SMOOTHING_FACTOR;// stores smoothing factor for led transition
-uint8_t currentState = st_clock;              // stores current state
+uint8_t currentState = st_clock;              // stores current state //Onno st_diclock
 bool stateAutoChange = false;                 // stores state of automatic state change
 bool nightMode = false;                       // stores state of nightmode
-uint32_t maincolor_clock = colors24bit[2];    // color of the clock and digital clock
+uint32_t maincolor_clock = colors24bit[0];    // color of the clock and digital clock // was [2]
 uint32_t maincolor_snake = colors24bit[1];    // color of the random snake animation
 bool apmode = false;                          // stores if WiFi AP mode is active
 
@@ -211,6 +214,8 @@ bool h12Flag;
 bool pmFlag;
 
 WiFiManager wifiManager;
+
+bool ntpsetup = false;
 
 // ----------------------------------------------------------------------------------
 //                                        SETUP
@@ -234,6 +239,9 @@ void setup() {
   //Init EEPROM
   EEPROM.begin(EEPROM_SIZE);
 
+  Serial.println("configure button");
+  // configure button pin as input
+  pinMode(BUTTONPIN, INPUT_PULLUP);
 
   // setup Matrix LED functions
     Serial.println("configure matrix");
@@ -250,8 +258,9 @@ void setup() {
 
   /** Use WiFiMaanger for handling initial Wifi setup **/
 
+
   // Uncomment and run it once, if you want to erase all the stored information
-  wifiManager.resetSettings();
+  wifiManager.resetSettings();   //Onno
 
   // set custom ip for portal
   //wifiManager.setAPStaticIPConfig(IPAdress_AccessPoint, Gateway_AccessPoint, Subnetmask_AccessPoint);
@@ -276,11 +285,64 @@ void setup() {
   ledmatrix.setMinIndicator(15, 0);
   ledmatrix.drawOnMatrixInstant();
 
+   
+  
+  /** (alternative) Use directly STA/AP Mode of ESP8266   **/
+  
+  /* 
+  // We start by connecting to a WiFi network
+  Serial.print("Connecting to ");
+  Serial.println(WIFI_SSID);
+  
+  // We start by connecting to a WiFi network
+  WiFi.mode(WIFI_STA);
+  //Set new hostname
+  WiFi.hostname(hostname.c_str());
+  WiFi.begin(WIFI_SSID, WIFI_PASS);
+  //wifi_station_set_hostname("esplamp");
 
+  int timeoutcounter = 0;
+  while (WiFi.status() != WL_CONNECTED && timeoutcounter < 30) {
+    ledmatrix.setMinIndicator(15, colors24bit[6]);
+    ledmatrix.drawOnMatrixInstant();
+    delay(250);
+    ledmatrix.setMinIndicator(15, 0);
+    ledmatrix.drawOnMatrixInstant();
+    delay(250);
+    Serial.print(".");
+    timeoutcounter++;
+  }
+
+  // start request of program
+  if (WiFi.status() == WL_CONNECTED) {      //Check WiFi connection status
+    Serial.println("");
+
+    Serial.println("WiFi connected");
+    Serial.println("IP address: ");
+    Serial.println(WiFi.localIP()); 
+    WiFi.setAutoReconnect(true);
+    WiFi.persistent(true);
+  
+  } else {
+    // no wifi found -> open access point
+    WiFi.mode(WIFI_AP);
+    WiFi.softAPConfig(IPAdress_AccessPoint, Gateway_AccessPoint, Subnetmask_AccessPoint);
+    WiFi.softAP(AP_SSID, AP_PASS);
+    apmode = true;
+
+    // start DNS Server
+    DnsServer.setTTL(300);
+    DnsServer.start(DNSPort, WebserverURL, IPAdress_AccessPoint);
+
+    IPAddress myIP = WiFi.softAPIP();
+    Serial.print("AP IP address: ");
+    Serial.println(myIP);
+  }*/
 
   if (WiFi.status() == WL_CONNECTED) {
     // init ESP8266 File manager (LittleFS)
     setupFS();
+
     // setup OTA
     setupOTA(hostname);
 
@@ -288,8 +350,7 @@ void setup() {
     server.on("/data", handleDataRequest); // process datarequests
     server.on("/leddirect", HTTP_POST, handleLEDDirect); // Call the 'handleLEDDirect' function when a POST request is made to URI "/leddirect"
     server.begin();
-  
-  
+    
     // create UDP Logger to send logging messages via UDP multicast
     logger = UDPLogger(WiFi.localIP(), logMulticastIP, logMulticastPort);
     logger.setName("Wordclock 2.0");
@@ -301,7 +362,6 @@ void setup() {
     delay(10);
     logger.logString("IP: " + WiFi.localIP().toString());
   }
-
   for(int r = 0; r < HEIGHT; r++){
     for(int c = 0; c < WIDTH; c++){
       matrix.fillScreen(0);
@@ -326,7 +386,7 @@ void setup() {
     ledmatrix.printNumber(4, 6, (address/10)%10, maincolor_clock);
     ledmatrix.printNumber(8, 6, address%10, maincolor_clock);
     ledmatrix.drawOnMatrixInstant();
-    delay(2000);
+    delay(2000); //Onno was 2000
   }
 
   // clear matrix
@@ -334,9 +394,11 @@ void setup() {
   ledmatrix.drawOnMatrixInstant();
   int hours = rtc.getHour(h12Flag, pmFlag);
   int minutes = rtc.getMinute();
+
   // setup NTP
   if (WiFi.status() == WL_CONNECTED) {
     ntp.setupNTPClient();
+    ntpsetup = true;
     logger.logString("NTP running");
     logger.logString("Time: " +  ntp.getFormattedTime());
     logger.logString("TimeOffset (seconds): " + String(ntp.getTimeOffset()));
@@ -394,9 +456,23 @@ void loop() {
   // handle OTA
   handleOTA();
   wifiManager.process();
-  
-  // handle Webserver
-  // server.handleClient();
+  if (WiFi.status() == WL_CONNECTED) {
+    // handle Webserver
+    server.handleClient();
+    if (!ntpsetup) {
+      setupFS();
+
+      // setup OTA
+      setupOTA(hostname);
+
+      server.on("/cmd", handleCommand); // process commands
+      server.on("/data", handleDataRequest); // process datarequests
+      server.on("/leddirect", HTTP_POST, handleLEDDirect); // Call the 'handleLEDDirect' function when a POST request is made to URI "/leddirect"
+      server.begin();
+      ntp.setupNTPClient();
+      ntpsetup = true;      
+    }
+  }
   // send regularly heartbeat messages via UDP multicast
   if(millis() - lastheartbeat > PERIOD_HEARTBEAT){
     Serial.println("Heartbeat, state: " + stateNames[currentState] + "\n");
@@ -432,7 +508,7 @@ void loop() {
       // state diclock
       case st_diclock:
         {
-          int hours;
+        int hours;
           int minutes;
           if (WiFi.status() == WL_CONNECTED) {
             hours = ntp.getHours24();
@@ -506,6 +582,8 @@ void loop() {
     lastAnimationStep = millis();
   }
 
+  // handle button press
+ handleButton(); 
 
   // handle state changes
   if(stateAutoChange && (millis() - lastStateChange > PERIOD_STATECHANGE) && !nightMode){
@@ -534,8 +612,15 @@ void loop() {
 
   // check if nightmode need to be activated
   if(millis() - lastNightmodeCheck > PERIOD_NIGHTMODECHECK){
-    int hours = ntp.getHours24();
-    int minutes = ntp.getMinutes();
+    int hours;
+    int minutes;
+    if (WiFi.status() == WL_CONNECTED) {
+      hours = ntp.getHours24();
+      minutes = ntp.getMinutes();
+    } else {
+      hours = rtc.getHour(h12Flag, pmFlag);
+      minutes = rtc.getMinute();
+    }
     
     if(hours == nightModeStartHour && minutes == nightModeStartMin){
       setNightmode(true);
@@ -669,6 +754,46 @@ void handleLEDDirect() {
     }
     server.send(200, "text/plain", message);
   }
+}
+
+/**
+ * @brief Check button commands
+ * 
+ */
+void handleButton(){
+  static bool lastButtonState = false;
+  bool buttonPressed = !digitalRead(BUTTONPIN);
+  // check rising edge
+  if(buttonPressed == true && lastButtonState == false){
+    // button press start
+    Serial.println("Button press started");
+    logger.logString("Button press started");
+    buttonPressStart = millis();
+  }
+  // check falling edge
+  if(buttonPressed == false && lastButtonState == true){
+    // button press ended
+    if((millis() - buttonPressStart) > LONGPRESS){
+      // longpress -> nightmode
+      Serial.println("Button press ended - longpress");
+      logger.logString("Button press ended - longpress");
+
+      setNightmode(true);
+    }
+    else if((millis() - buttonPressStart) > SHORTPRESS){
+      // shortpress -> state change 
+      Serial.println("Button press ended - shortpress");
+      logger.logString("Button press ended - shortpress");
+
+      if(nightMode){
+        setNightmode(false);
+      }else{
+        stateChange((currentState + 1) % NUM_STATES);
+      }
+      
+    }
+  }
+  lastButtonState = buttonPressed;
 }
 
 /**

@@ -1,6 +1,7 @@
 
 //const String clockStringGerman =  "ESPISTAFUNFVIERTELZEHNZWANZIGUVORTECHNICNACHHALBMELFUNFXCONTROLLEREINSEAWZWEIDREITUMVIERSECHSQYACHTSIEBENZWOLFZEHNEUNJUHR"; //Onno
-const String clockStringGerman =  "HETVISNEENZESTWEEDRIEZVIERVIJFZEVENACHTNEGEN-TIENELFTWAALFDERTIENVEERTIENKWARTVOOROVERTHALFEENXTWEENDRIEVIERGVIJFNZESKLZEVENMACHTRFNEGENSTIENEETWAALFIT*****ELFLNUUR*****";
+//const String clockStringGerman =  "HETVISNEENZESTWEEDRIEZVIERVIJFZEVENACHTNEGEN-TIENELFTWAALFDERTIENVEERTIENKWARTVOOROVERTHALFEENXTWEENDRIEVIERGVIJFNZESKLZEVENMACHTRFNEGENSTIENEETWAALFIT*****ELFLNUUR*****";
+const String clockStringGerman =  "HETVISNEENZESTWEEDRIEZVIERVIJFZEVENACHTNEGEN-TIENELFTWAALFDERTIENVEERTIENKWARTVOOROVERTHALFEENXTWEENDRIEVIERGVIJFNZESKLZEVENMACHTRFNEGENSTIENEETWAALFITELFLNTBGUUR&*****&";
 // Onno let op Q ipv -
 
 /**
@@ -78,7 +79,7 @@ int showStringOnClock(String message, uint32_t color){
         }
         else{
           // word is not possible to show on clock
-          logger.logString("word is not possible to show on clock: " + String(word));
+          Serial.println("word is not possible to show on clock: " + String(word));
           return -1;
         }
         //logger.logString(String(nextSpace) + " - " + String());
@@ -89,9 +90,15 @@ int showStringOnClock(String message, uint32_t color){
     }
     for(int i = 0; i < clockStringGerman.length(); i++){
       if (clockStringGerman.charAt(i) == '*') {
+      
         int x = (i)%WIDTH;
         int y = (i)/WIDTH;
-        ledmatrix.gridAddPixel(x, y, color);
+        ledmatrix.gridAddPixel(x, y, colors24bit[6]);
+      }
+        else if (clockStringGerman.charAt(i) == '&') {
+        int x = (i)%WIDTH;
+        int y = (i)/WIDTH;
+        ledmatrix.gridAddPixel(x, y, colors24bit[4]); //was 1
       }
     }
     // return success
@@ -160,7 +167,6 @@ String timeToString(uint8_t hours,uint8_t minutes){
   // message += "QQQQQ "; //Onno
   
   Serial.println(message);
-  logger.logString("time as String: " + String(message));
 
   return message;
 }
