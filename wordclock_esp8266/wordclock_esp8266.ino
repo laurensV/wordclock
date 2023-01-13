@@ -52,12 +52,13 @@
 //                                        CONSTANTS
 // ----------------------------------------------------------------------------------
 
-#define EEPROM_SIZE 20      // size of EEPROM to save persistent variables
+#define EEPROM_SIZE 24      // size of EEPROM to save persistent variables
 #define ADR_NM_START_H 0
 #define ADR_NM_END_H 4
 #define ADR_NM_START_M 8
 #define ADR_NM_END_M 12
 #define ADR_BRIGHTNESS 16
+#define ADR_RTC 20
 
 
 #define NEOPIXELPIN 0       // pin to which the NeoPixels are attached
@@ -227,17 +228,26 @@ void setup() {
   delay(100);
   Serial.println();
   Serial.printf("\nSketchname: %s\nBuild: %s\n", (__FILE__), (__TIMESTAMP__));
-  DateTime compiled = DateTime(__DATE__, __TIME__);
-
-	// Start the I2C interface (needed for DS3231 clock)
-	Wire.begin();
-  rtc.setClockMode(false);
-  rtc.setHour(compiled.hour());
-  rtc.setMinute(compiled.minute());
-  rtc.setSecond(compiled.second());
 
   //Init EEPROM
   EEPROM.begin(EEPROM_SIZE);
+
+	// Start the I2C interface (needed for DS3231 clock)
+	Wire.begin();
+  if (readIntEEPROM(ADR_RTC)) {
+    Serial.println("RTC already set, skipping set time");
+  } else {
+    DateTime compiled = DateTime(__DATE__, __TIME__);
+    Serial.println("setting RTC to compile time");
+    rtc.setClockMode(false);
+    rtc.setHour(compiled.hour());
+    rtc.setMinute((compiled.minute() + 1) % 60);
+    rtc.setSecond(0);
+    writeIntEEPROM(ADR_RTC, 1);
+  }
+
+
+
 
   Serial.println("configure button");
   // configure button pin as input
@@ -287,57 +297,6 @@ void setup() {
 
    
   
-  /** (alternative) Use directly STA/AP Mode of ESP8266   **/
-  
-  /* 
-  // We start by connecting to a WiFi network
-  Serial.print("Connecting to ");
-  Serial.println(WIFI_SSID);
-  
-  // We start by connecting to a WiFi network
-  WiFi.mode(WIFI_STA);
-  //Set new hostname
-  WiFi.hostname(hostname.c_str());
-  WiFi.begin(WIFI_SSID, WIFI_PASS);
-  //wifi_station_set_hostname("esplamp");
-
-  int timeoutcounter = 0;
-  while (WiFi.status() != WL_CONNECTED && timeoutcounter < 30) {
-    ledmatrix.setMinIndicator(15, colors24bit[6]);
-    ledmatrix.drawOnMatrixInstant();
-    delay(250);
-    ledmatrix.setMinIndicator(15, 0);
-    ledmatrix.drawOnMatrixInstant();
-    delay(250);
-    Serial.print(".");
-    timeoutcounter++;
-  }
-
-  // start request of program
-  if (WiFi.status() == WL_CONNECTED) {      //Check WiFi connection status
-    Serial.println("");
-
-    Serial.println("WiFi connected");
-    Serial.println("IP address: ");
-    Serial.println(WiFi.localIP()); 
-    WiFi.setAutoReconnect(true);
-    WiFi.persistent(true);
-  
-  } else {
-    // no wifi found -> open access point
-    WiFi.mode(WIFI_AP);
-    WiFi.softAPConfig(IPAdress_AccessPoint, Gateway_AccessPoint, Subnetmask_AccessPoint);
-    WiFi.softAP(AP_SSID, AP_PASS);
-    apmode = true;
-
-    // start DNS Server
-    DnsServer.setTTL(300);
-    DnsServer.start(DNSPort, WebserverURL, IPAdress_AccessPoint);
-
-    IPAddress myIP = WiFi.softAPIP();
-    Serial.print("AP IP address: ");
-    Serial.println(myIP);
-  }*/
 
   if (WiFi.status() == WL_CONNECTED) {
     // init ESP8266 File manager (LittleFS)
