@@ -146,7 +146,7 @@ void setupPersistentVars() {
   EEPROM.begin(EEPROM_SIZE);
 
   // Uncomment and run it once, if you want to erase stored info
-  // resetEEPROM();
+  //resetEEPROM();
 
   EEPROM.get(ADR_MODE, mode);
 
