@@ -181,9 +181,17 @@ void setupPersistentVars() {
 
   // Uncomment and run it once, if you want to erase stored info
   // resetEEPROM();
-
+ 
   EEPROM.get(ADR_CLOCK_WIDTH, clockWidth);
   EEPROM.get(ADR_CLOCK_HEIGHT, clockHeight);
+
+  // If we detect that clockWidth or clockHeight are 0xff, we must reset EEPROM to be filled with 0s (no idea why new ESP8266 start with 0xff now..)
+  if (clockWidth == 255 || clockHeight == 255) {
+    resetEEPROM();
+    EEPROM.get(ADR_CLOCK_WIDTH, clockWidth);
+    EEPROM.get(ADR_CLOCK_HEIGHT, clockHeight);
+  }
+
   clockLayout = "";
 
   if (!clockWidth || !clockHeight) {
